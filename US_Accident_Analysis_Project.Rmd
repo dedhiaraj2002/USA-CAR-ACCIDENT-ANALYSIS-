@@ -1,0 +1,490 @@
+---
+title: "PDA_Project_US_Car_Accidents_Analysis"
+author: "Group13"
+date: "2023-11-28"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# US Car Accident Analysis
+
+### Inlcuded Libraries
+
+```{r echo = FALSE}
+library(tidyverse)
+library(lubridate)
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+require(ISLR)
+library(MASS)
+library(MLmetrics)
+library(corrplot)
+```
+
+
+
+# PART I: Data Preperation and cleaning
+
+
+```{r}
+# read the file into a variable
+USAcaraccidents = read.csv("C:/Users/anush/OneDrive/Documents/Data Analytics/US_Accidents_March23_sampled_500k.csv")
+```
+
+```{r}
+head(USAcaraccidents)
+```
+
+```{r}
+#Checking for Null Values
+sum(is.na(USAcaraccidents))
+```
+```{r}
+#Removing null value rows
+USAcaraccidents <- USAcaraccidents[complete.cases(USAcaraccidents), ]
+```
+
+```{r}
+#Confirming cleanup
+sum(is.na(USAcaraccidents))
+```
+```{r}
+#Total size
+nrow(USAcaraccidents)
+```
+
+```{r}
+summary(USAcaraccidents)
+```
+
+
+
+
+# PART II: Exploratory Data Analysis
+
+### 1.Temperature Distribution Analysis:
+
+* The overlay histogram and boxplot reveal that accidents with severity 2 tend to occur more frequently in extreme temperature conditions compared to severity 3 accidents.
+
+```{r}
+# Overlay Histogram with Severity
+hist(USAcaraccidents$Temperature[USAcaraccidents$Severity == 2], col = rgb(1, 0, 0, 0.5), main = "Overlay Histogram", xlab = "Temperature (F)", ylab = "Frequency")
+hist(USAcaraccidents$Temperature[USAcaraccidents$Severity == 3], col = rgb(0, 0, 1, 0.5), add = TRUE)
+legend("topright", legend = c("Severity 2", "Severity 3"), fill = c(rgb(1, 0, 0, 0.5), rgb(0, 0, 1, 0.5)))
+
+```
+
+```{r}
+# Boxplot for Temperature
+boxplot(USAcaraccidents$Temperature, main = "Temperature Distribution", ylab = "Temperature (F)")
+```
+
+### 2.Weather Conditions Distribution Bar Plot:
+
+* Fair/Windy weather conditions dominate the dataset, followed by cloudy conditions. Adverse weather conditions are less common, indicating that most accidents occur in relatively clear weather.
+```{r}
+# Bar plot for Weather Conditions
+weather_counts <- table(USAcaraccidents$Weather_Condition)
+barplot(weather_counts, main = "Weather Conditions Distribution", ylab = "Count", col = "lightgreen", las = 2)
+
+```
+### 3.Hourly Accident Distribution Bar Plot:
+
+* Accidents are relatively evenly distributed across different hours of the day, with a slight increase during the afternoon.
+
+```{r}
+# Extracting the hour from Start_Time
+USAcaraccidents$Hour <- as.POSIXlt(USAcaraccidents$Start_Time)$hour
+
+# Hourly accident distribution
+hourly_counts <- table(USAcaraccidents$Hour)
+barplot(hourly_counts, main = "Hourly Accident Distribution", xlab = "Hour", ylab = "Count", col = "lightcoral")
+
+```
+
+
+### 4.Accidents by Location Scatter Plot:
+
+* The scatter plot shows the geographical distribution of accidents, highlighting potential hot-spots or areas with higher accident frequencies.
+
+```{r}
+# Scatter plot of accidents based on latitude and longitude with transparency and smaller points
+plot(USAcaraccidents$Start_Lng, USAcaraccidents$Start_Lat, col = rgb(0, 0, 1, 0.1), pch = 16, main = "Accidents by Location", xlab = "Longitude", ylab = "Latitude")
+
+```
+
+### 5.Temperature by Severity Boxplot:
+
+The boxplot suggests that there is a variation in temperature for different severity levels, with severity 3 accidents showing a wider range of temperatures.
+```{r}
+boxplot(Temperature.F. ~ Severity, data = USAcaraccidents, main = "Temperature by Severity", xlab = "Severity", ylab = "Temperature (F)", col = "lightblue")
+
+```
+
+### 7.Temperature Distribution Histogram:
+
+The histogram provides a clear overview of the temperature distribution in accidents, helping identify common temperature ranges.
+```{r}
+# Histogram for Temperature
+hist(USAcaraccidents$Temperature.F., main = "Distribution of Temperature", xlab = "Temperature (F)", col = "lightblue")
+
+```
+
+### 8.Visibility Category Bar Plot:
+
+Accidents are more frequent in higher visibility conditions, with the majority falling within the 5-10 miles visibility range.
+```{r}
+# Create Visibility Categories
+USAcaraccidents$Visibility_Category <- cut(USAcaraccidents$Visibility.mi., breaks = c(0, 1, 2, 3, 4, 5, 10, Inf), labels = c("0-1", "1-2", "2-3", "3-4", "4-5", "5-10", "10+"))
+
+# Bar Plot for Visibility Categories
+barplot(table(USAcaraccidents$Visibility_Category), 
+        main = "Accident Frequency by Visibility Category",
+        xlab = "Visibility Category",
+        ylab = "Number of Accidents",
+        col = "skyblue")
+
+
+```
+
+
+### 9.Severity Distribution Bar Plot (ggplot2):
+
+Using ggplot2, the bar plot reiterates the distribution of accident severity, providing an alternative visualization.
+```{r}
+ggplot(data = USAcaraccidents, aes(x = Severity)) +
+  geom_bar(fill = "skyblue") +
+  ggtitle("Distribution of Severity")
+
+```
+
+
+### 10.Impact of Traffic Signals on Severity Stacked Bar Plot:
+
+The stacked bar plot indicates that the presence of traffic signals has a marginal impact on accident severity, with severity 2 being slightly higher at locations with traffic signals.
+```{r}
+
+# Assuming 'Traffic_Signal' is the column indicating the presence of traffic signals
+# Assuming 'Severity' is the column indicating the severity of accidents
+
+# Convert 'Severity' to factor
+USAcaraccidents$Severity <- as.factor(USAcaraccidents$Severity)
+
+# Create a new column to categorize locations with and without traffic signals
+USAcaraccidents$Signal_Category <- ifelse(USAcaraccidents$Traffic_Signal, "With Traffic Signal", "Without Traffic Signal")
+
+# Create a bar plot to compare severity distribution
+ggplot(data = USAcaraccidents, aes(x = Signal_Category, fill = Severity)) +
+  geom_bar(position = "fill", show.legend = TRUE) +
+  ggtitle("Impact of Traffic Signals on Accident Severity") +
+  xlab("Traffic Signal Presence") +
+  ylab("Proportion of Accidents") +
+  scale_fill_manual(values = c("1" = "red", "2" = "orange", "3" = "yellow", "4" = "green"))
+
+
+
+```
+
+### 11.Accident Trends Over Years Time Series Plot:
+
+
+* The time series plot illustrates the overall trend in accident frequency over the years, revealing any notable patterns or changes.
+```{r}
+
+
+# Assuming 'Start_Time' is the column indicating the start time of accidents
+# Convert 'Start_Time' to POSIXct format
+USAcaraccidents$Start_Time <- as.POSIXct(USAcaraccidents$Start_Time, format = "%Y-%m-%d %H:%M:%S", tz = "UTC")
+
+# Extract year and month for time series analysis
+USAcaraccidents$YearMonth <- format(USAcaraccidents$Start_Time, "%Y-%m")
+
+# Time series plot for accident frequency over years
+ggplot(data = USAcaraccidents, aes(x = Start_Time)) +
+  geom_freqpoly(binwidth = 60*60*24*365, color = "blue") +
+  ggtitle("Accident Trends Over Years") +
+  xlab("Year") +
+  ylab("Accident Frequency")
+
+```
+
+
+
+### 12.Accident Frequency by Day of Week Stacked Bar Plot:
+
+* Accidents are fairly evenly distributed throughout the week, with a slight increase during weekdays compared to weekends.
+```{r}
+ggplot(USAcaraccidents, aes(x = factor(wday(Start_Time, label = TRUE, abbr = FALSE)), fill = factor(Severity))) +
+  geom_bar(position = "stack") +
+  ggtitle("Accident Frequency by Day of Week") +
+  xlab("Day of Week") +
+  ylab("Count") +
+  scale_fill_manual(values = c("1" = "green", "2" = "yellow", "3" = "red", "4" = "purple"))
+
+```
+
+
+
+# PART III: Hypothesis Testing
+
+```{r}
+severity <- USAcaraccidents$Severity
+```
+
+```{r}
+temperature <- USAcaraccidents$Temperature.F.
+```
+
+> Null Hypothesis - There is no significant difference in accident severity between tempratures above 50 and temprature 50 or below.
+<br>
+> Alternate Hypothesis - There is a significant difference in accident severity between tempratures above 50 and temprature 50 or below.
+
+```{r}
+severity_above_threshold <- severity[temperature > 50]
+severity_below_threshold <- severity[temperature <= 50]
+```
+
+```{r}
+severity_above_threshold <- as.numeric(severity_above_threshold)
+severity_below_threshold <- as.numeric(severity_below_threshold)
+t_test_result <- t.test(severity_above_threshold, severity_below_threshold)
+t_test_result
+```
+
+```{r}
+alpha <- 0.05
+if (t_test_result$p.value < alpha) {
+  print("Reject the null hypothesis. There is a significant difference in accident severity based on temperature.")
+} else {
+  print("Fail to reject the null hypothesis. No significant difference in accident severity based on temperature.")
+}
+```
+
+```{r}
+day_night <- USAcaraccidents$Sunrise_Sunset
+```
+
+> Null Hypothesis (H0) - There is no significant difference in accident severity between day and night.
+<br>
+Alternate Hypothesis (H1) - There is a significant difference in accident severity between day and night.
+
+
+```{r}
+severity_day <- severity[day_night == "Day"]
+severity_night <- severity[day_night == "Night"]
+severity_day <- as.numeric(severity_day)
+severity_night <- as.numeric(severity_night)
+t_test_result <- t.test(severity_day, severity_night)
+t_test_result
+```
+
+```{r}
+alpha <- 0.05
+if (t_test_result$p.value < alpha) {
+  print("Reject the null hypothesis. There is a significant difference in accident severity between day and night.")
+} else {
+  print("Fail to reject the null hypothesis. No significant difference in accident severity between day and night.")
+}
+```
+
+
+
+
+# PART IV: Linear Regression Modals
+
+
+```{r}
+#Creating a variable containing only continuous numerical variables
+selected_columns <- c('Distance.mi.', 'Temperature.F.', 'Wind_Chill.F.','Humidity...', 'Pressure.in.','Visibility.mi.', 'Wind_Speed.mph.', 'Precipitation.in.')
+```
+
+```{r}
+pairs(USAcaraccidents[selected_columns], col ="blue")
+```
+
+```{r}
+# Calculate the correlation matrix for numeric variables
+correlation_matrix <- cor(USAcaraccidents[selected_columns])
+# Print the correlation matrix
+print(correlation_matrix)
+```
+
+>> We can observe that Temperature, Wind Chill, Pressure and Visibility are inversely related to Distance.
+<br>
+>>Pressure has the highest correlation with Distance but that does not make sense. In the correlation table we observe that pressure has a positive relation with temperature, which doesn't seem possible. So we can mark our observations here and continue with other
+
+
+### Let's create a simple Linear regression model
+
+```{r}
+Numerical_accident_data <- USAcaraccidents[selected_columns]
+summary(Numerical_accident_data)
+```
+
+
+```{r}
+# Splitting the dataset into 2
+train_index = sample(2,nrow(Numerical_accident_data),replace=TRUE, prob = c(0.8,0.2))
+Accident_Training <- Numerical_accident_data[train_index==1,]
+Accident_Testing <- Numerical_accident_data[train_index==2,]
+dim(Accident_Training)
+dim(Accident_Testing)
+```
+
+
+
+```{r}
+#Creating a simple linear regression modal
+lm_model1 <- lm(Distance.mi. ~ Precipitation.in., data=Accident_Training)
+summary(lm_model1)
+```
+### Let's answer a couple of question:
+
+* Is there a relationship between the predictor and the response? => Yes
+
+* How strong is the relationship between the predictor and the response? => p
+ -value is close to 0: relationship is strong
+
+* Is the relationship between the predictor and the response positive or negative? => Positive
+
+* In summary, the model suggests that there is a statistically significant positive relationship between Precipitation.in. and Distance.mi., meaning that an increase in precipitation is associated with an increase in distance of accident.
+
+```{r}
+# model 2
+lm_model2 <- lm(Distance.mi. ~ Visibility.mi., data=Accident_Training)
+summary(lm_model2)
+```
+* Is there a relationship between the predictor and the response? => Yes
+
+* How strong is the relationship between the predictor and the response? => p
+ -value is close to 0: relationship is strong
+
+* Is the relationship between the predictor and the response positive or negative? => Negative
+
+* In summary, this model suggests that visibility has a statistically significant effect on distance. This means that a decrease in visibility tends to lead to larger distance of the accident.
+
+
+```{r}
+# model 3
+lm_model3 <- lm(Distance.mi. ~ Wind_Chill.F., data=Accident_Training)
+summary(lm_model3)
+```
+* In summary, the model suggests a statistically significant relationship between the predictor (Wind_Chill) and the response variable (Distance)
+
+### Let's summarize prediction data and calculate MAE (Mean Absolute Error) and MSE (Mean Squared Error) . MAE and MSE are both metrics commonly used to evaluate the performance of a regression model
+
+```{r}
+predictions1 <- predict(lm_model1, newdata = Accident_Testing)
+predictions2 <- predict(lm_model2, newdata = Accident_Testing)
+predictions3 <- predict(lm_model3, newdata = Accident_Testing)
+summary(predictions1)
+```
+
+```{r}
+summary(predictions2)
+```
+```{r}
+summary(predictions3)
+```
+```{r}
+MAE(y_pred = predictions1, y_true = Accident_Testing$Distance.mi.)
+```
+
+```{r}
+MAE(y_pred = predictions2, y_true = Accident_Testing$Distance.mi.)
+```
+```{r}
+MAE(y_pred = predictions3, y_true = Accident_Testing$Distance.mi.)
+```
+```{r}
+MSE(y_pred = predictions1, y_true = Accident_Testing$Distance.mi.)
+```
+
+```{r}
+MSE(y_pred = predictions2, y_true = Accident_Testing$Distance.mi.)
+```
+```{r}
+MSE(y_pred = predictions3, y_true = Accident_Testing$Distance.mi.)
+```
+
+
+# Multiple Linear Regression
+
+
+```{r}
+multiplelm1 <- lm(Distance.mi.~., data=Accident_Training)
+summary(multiplelm1)
+```
+```{r}
+ypred <-predict(object = multiplelm1, newdata = Accident_Testing)
+summary(ypred)
+```
+
+
+```{r}
+MAE(y_pred = ypred, y_true = Accident_Testing$Distance.mi.)
+```
+
+```{r}
+MSE(y_pred = ypred, y_true = Accident_Testing$Distance.mi.)
+```
+
+# Forward Stepwise regression
+
+```{r}
+intercept_only <- lm(Distance.mi. ~ 1, data= Accident_Training)
+all <- lm(Distance.mi. ~., data=Accident_Training)
+forward <- stepAIC (intercept_only, direction='forward',scope = formula(all))
+```
+
+```{r}
+summary(forward)
+```
+
+>>In summary, the final iteration model includes predictors Pressure.in., Visibility.mi., Wind_Chill.F., Temperature.F., and Humidity..., and it has the lowest AIC among the considered models. This model is chosen as it strikes a balance between model complexity and goodness of fit. It can be noted that the improvement made by adding humidity had a very small improvement.
+
+```{r}
+ypred_forward <-predict(object = forward, newdata = Accident_Testing)
+MAE(y_pred = ypred_forward, y_true = Accident_Testing$Distance.mi.)
+```
+```{r}
+MSE(y_pred = ypred_forward, y_true = Accident_Testing$Distance.mi.)
+```
+
+# Backward Stepwise Regression
+
+```{r}
+backward <- stepAIC (all, direction='backward')
+```
+```{r}
+summary(backward)
+```
+
+>> The output then shows the stepwise elimination of variables based on the AIC.The first step eliminates the variable "Precipitation.in.", the second step eliminates "Wind_Speed.mph."
+
+```{r}
+ypred_backward <-predict(object = backward, newdata = Accident_Testing)
+MAE(y_pred = ypred_backward, y_true = Accident_Testing$Distance.mi.)
+```
+
+```{r}
+MSE(y_pred = ypred_backward, y_true = Accident_Testing$Distance.mi.)
+```
+
+
+### What happens if we don't include Distance at all? Let's instead try to use Temperature as the response variable.
+
+```{r}
+multiplelm_withoutdistance <- lm(Temperature.F.~., data=Accident_Training[,2:8])
+summary(multiplelm_withoutdistance)
+```
+```{r}
+par(mfrow=c(2,2))
+plot(multiplelm_withoutdistance)
+```
+
